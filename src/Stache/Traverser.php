@@ -4,6 +4,7 @@ namespace Statamic\Stache;
 
 use Illuminate\Filesystem\Filesystem;
 use Statamic\Facades\Path;
+use Symfony\Component\Finder\Finder;
 
 class Traverser
 {
@@ -17,26 +18,32 @@ class Traverser
 
     public function traverse($store)
     {
-        if (! $dir = $store->directory()) {
+        if (!$dir = $store->directory()) {
             throw new \Exception("Store [{$store->key()}] does not have a directory defined.");
         }
 
         $dir = rtrim($dir, '/');
-
-        if (! $this->filesystem->exists($dir)) {
+        if (!$this->filesystem->exists($dir)) {
             return collect();
         }
 
-        $files = collect($this->filesystem->allFiles($dir));
-
+        $it = Finder::create()->in($dir)->files()->ignoreDotFiles(true);
         if ($this->filter) {
-            $files = $files->filter($this->filter);
+            $it = $it->filter($this->filter);
         }
 
-        return $files
-            ->mapWithKeys(function ($file) {
-                return [Path::tidy($file->getPathname()) => $file->getMTime()];
-            })->sort();
+        $paths = [];
+        foreach ($it as $file) {
+            /** @var \SplFileInfo $file */
+
+            $path = Path::tidy($file->getPathname());
+            $timestamp = $file->getMTime();
+
+            yield $path => $timestamp;
+            $paths[$path] = $timestamp;
+        }
+
+        return collect($paths);
     }
 
     public function filter($filter)

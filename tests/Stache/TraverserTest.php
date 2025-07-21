@@ -55,7 +55,7 @@ class TraverserTest extends TestCase
         $store->shouldReceive('directory')->andReturn($this->tempDir.'/non-existent');
         $store->shouldReceive('filter')->andReturnTrue();
 
-        $files = $this->traverser->traverse($store);
+        $files = iterator_to_array($this->traverser->traverse($store), false);
 
         $this->assertInstanceOf(Collection::class, $files);
         $this->assertCount(0, $files);
@@ -74,7 +74,7 @@ class TraverserTest extends TestCase
         $store->shouldReceive('directory')->andReturn($this->tempDir);
         $store->shouldReceive('filter')->andReturnTrue();
 
-        $files = $this->traverser->traverse($store);
+        $files = iterator_to_array($this->traverser->traverse($store), false);
 
         $this->assertInstanceOf(Collection::class, $files);
         $this->assertCount(3, $files);
@@ -115,7 +115,7 @@ class TraverserTest extends TestCase
             return $file->getExtension() === 'txt';
         };
 
-        $files = $this->traverser->filter($filter)->traverse($store);
+        $files = iterator_to_array($this->traverser->filter($filter)->traverse($store), false);
 
         $this->assertCount(2, $files);
         $dir = Path::tidy($this->tempDir);

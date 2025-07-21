@@ -174,7 +174,7 @@ abstract class Store
         // This whole process can be disabled to save overhead, at the expense of needing to update
         // the cache manually. If the Control Panel is being used, or the cache is cleared when
         // deployed, for example, this will happen naturally and disabling is a good idea.
-        if (! Stache::isWatcherEnabled()) {
+        if (!Stache::isWatcherEnabled()) {
             return;
         }
 
@@ -198,7 +198,7 @@ abstract class Store
         // This includes both newly added files, and existing files that have been changed.
         $modified = $files->filter(function ($timestamp, $path) use ($existing) {
             // No existing timestamp, it must be a new file.
-            if (! $existingTimestamp = $existing->get($path)) {
+            if (!$existingTimestamp = $existing->get($path)) {
                 return true;
             }
 
@@ -287,7 +287,7 @@ abstract class Store
     {
         $this->handleFileChanges();
 
-        if ($this->paths && ! Statamic::isWorker()) {
+        if ($this->paths && !Statamic::isWorker()) {
             return $this->paths;
         }
 
@@ -297,35 +297,29 @@ abstract class Store
 
         $files = Traverser::filter([$this, 'getItemFilter'])->traverse($this);
 
-        $fileItems = $files->map(function ($timestamp, $path) {
-            return [
-                'item' => $item = $this->makeItemFromFile($path, File::get($path)),
-                'key' => $this->getItemKey($item),
-                'path' => $path,
-            ];
-        });
+        $paths = [];
+        foreach ($files as $path => $timestamp) {
+            $item = $this->makeItemFromFile($path, File::get($path));
+            $key = $this->getItemKey($item);
 
-        $items = $fileItems->reject(function ($item) {
             try {
                 $this->keys()->add($item['key'], $item['path']);
             } catch (DuplicateKeyException $e) {
-                $isDuplicate = true;
                 Stache::duplicates()->track($this, $e->getKey(), $e->getPath());
+                continue;
             }
 
-            return $isDuplicate ?? false;
-        });
-
-        $paths = $items->pluck('path', 'key');
+            $paths[$key] = $path;
+        }
 
         $this->cachePaths($paths);
-
         $this->keys()->cache();
-
         Stache::duplicates()->cache();
 
         return $paths;
     }
+
+    abstract public function makeItemFromFile($path, $contents);
 
     protected function forgetPath($key)
     {

@@ -2,21 +2,48 @@
 
 namespace Statamic\Stache\Indexes;
 
+use Illuminate\Support\Facades\DB;
 use Statamic\Facades\Stache;
-use Statamic\Statamic;
 
 abstract class Index
 {
     protected $store;
     protected $name;
     protected $items = [];
-    protected $loaded = false;
-    private static ?string $currentlyLoading = null;
+    /** @var \Illuminate\Database\Connection $db */
+    protected $db;
 
     public function __construct($store, $name)
     {
         $this->store = $store;
         $this->name = $name;
+
+        $path = config("database.connections.stache_indexes.database");
+
+        if (!file_exists($path)) {
+            touch($path);
+        }
+
+        $this->db = DB::connection("stache_indexes");
+        $this->db->unprepared(<<<SQL
+            ; One time
+            PRAGMA auto_vacuum = incremental;
+            PRAGMA journal_mode = WAL;
+            PRAGMA page_size = 32768;
+
+            ; Every time
+            PRAGMA busy_timeout = 5000;
+            PRAGMA cache_size = -20000;
+            PRAGMA foreign_keys = ON;
+            PRAGMA incremental_vacuum;
+            PRAGMA mmap_size = 2147483648;
+            PRAGMA temp_store = MEMORY;
+            PRAGMA synchronous = NORMAL;
+        SQL);
+        $this->db->statement(
+            "CREATE TABLE IF NOT EXISTS '?' (key VARCHAR PRIMARY KEY, value TEXT)",
+            [$this->cacheKey()],
+        );
     }
 
     public function name()
@@ -26,89 +53,87 @@ abstract class Index
 
     public function items()
     {
-        return collect($this->items);
+        return $this->table()->pluck("value", "key");
     }
 
     public function values()
     {
-        return array_values($this->items);
+        return $this->table()->pluck("value")->all();
     }
 
     public function keys()
     {
-        return array_keys($this->items);
+        return $this->table()->pluck("key")->all();
     }
 
     public function get($key)
     {
-        return $this->items[$key] ?? null;
+        return $this->table()->where('key', (string) $key)->value('value');
     }
 
     public function has($key)
     {
-        return array_key_exists($key, $this->items);
+        return $this->table()->where('key', (string) $key)->exists();
     }
 
     public function put($key, $value)
     {
-        $this->items[$key] = $value;
+        $this->table()->updateOrInsert(
+            ['key' => (string) $key],
+            ['value' => (string) $value],
+        );
     }
 
     public function push($value)
     {
-        $this->items[] = $value;
+        $this->table()->insert([
+            'key' => (string) $value,
+            'value' => (string) $value,
+        ]);
     }
 
     public function load()
     {
-        if ($this->loaded) {
-            return $this;
-        }
-
-        $loadingKey = $this->store->key().'/'.$this->name;
-        $currentlyLoadingThis = static::$currentlyLoading === $loadingKey;
-
-        static::$currentlyLoading = $loadingKey;
-
-        $this->loaded = true;
-
-        if (Statamic::isWorker() && ! $currentlyLoadingThis) {
-            $this->loaded = false;
-        }
-
-        debugbar()->addMessage("Loading index: {$loadingKey}", 'stache');
-
-        $this->items = Stache::cacheStore()->get($this->cacheKey());
-
-        if ($this->items === null) {
-            $this->update();
-        }
-
-        $this->store->cacheIndexUsage($this);
-
-        static::$currentlyLoading = null;
-
         return $this;
     }
 
     public function update()
     {
-        if (! Stache::shouldUpdateIndexes()) {
+        if (!Stache::shouldUpdateIndexes()) {
             return $this;
         }
 
         debugbar()->addMessage("Updating index: {$this->store->key()}/{$this->name}", 'stache');
 
-        $this->items = $this->getItems();
+        $this->db->beginTransaction();
 
-        $this->cache();
+
+        $count = 0;
+        $chunk = [];
+        foreach ($this->getItems() as $item) {
+            $chunk[] = [
+                'key' => $this->store->getItemKey($item),
+                'value' => $this->getItemValue($item),
+            ];
+            $count++;
+
+            if ($count / 100 > 0) {
+                $this->table()->upsert($chunk, ['key'], ['value']);
+                $chunk = [];
+                $count = 0;
+            }
+        }
+
+        $this->table()->upsert($chunk, ['key'], ['value']);
+
+        $this->db->commit();
 
         return $this;
     }
 
     public function isCached()
     {
-        return Stache::cacheStore()->has($this->cacheKey());
+        return $this->db->getSchemaBuilder()->hasTable($this->cacheKey());
     }
 
     public function cache()
@@ -118,51 +143,32 @@ abstract class Index
 
     public function updateItem($item)
     {
-        $this->load();
-
         $this->put($this->store->getItemKey($item), $this->getItemValue($item));
-
-        $this->cache();
     }
 
     public function forgetItem($key)
     {
-        $this->load();
-
-        unset($this->items[$key]);
-
-        $this->cache();
+        $this->table()->where('key', $key)->delete();
     }
 
     abstract public function getItems();
+    abstract public function getItemValue($item);
 
     public function cacheKey()
     {
-        $searches = ['.', '/'];
-        $replacements = ['::', '->'];
+        return str($this->store->key())
+            ->replace([".", "->", "-]", "/", "::", "-"], "_")
+            ->append("_", $this->name)
+            ->value();
+    }
 
-        if (windows_os()) {
-            $replacements[1] = '-]';
-            $searches[] = '->';
-            $replacements[] = '-]';
-        }
-
-        return vsprintf('stache::indexes::%s::%s', [
-            $this->store->key(),
-            str_replace($searches, $replacements, $this->name),
-        ]);
+    public function table()
+    {
+        return $this->db->table($this->cacheKey());
     }
 
     public function clear()
     {
-        $this->loaded = false;
-        $this->items = null;
-
-        Stache::cacheStore()->forget($this->cacheKey());
-    }
-
-    public static function currentlyLoading()
-    {
-        return static::$currentlyLoading;
+        return $this->table()->delete();
     }
 }
