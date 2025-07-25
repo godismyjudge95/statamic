@@ -138,7 +138,7 @@ class AssetsTest extends TestCase
         $this->assertIsArray($replaced);
         $this->assertCount(1, $replaced);
         $this->assertInstanceOf(DimensionsRule::class, $replaced[0]);
-        $this->assertEquals(__('statamic::validation.dimensions'), $replaced[0]->message());
+        $this->assertEquals(__('statamic::validation.dimensions.invalid', ['dimensions' => 'width = 180 and height = 180']), $replaced[0]->message(100, 100));
     }
 
     #[Test]
@@ -151,7 +151,7 @@ class AssetsTest extends TestCase
         $this->assertIsArray($replaced);
         $this->assertCount(1, $replaced);
         $this->assertInstanceOf(ImageRule::class, $replaced[0]);
-        $this->assertEquals(__('statamic::validation.image'), $replaced[0]->message());
+        $this->assertEquals(__('statamic::validation.image', ['extensions' => implode(', ', $replaced[0]->extensions)]), $replaced[0]->message());
     }
 
     #[Test]
