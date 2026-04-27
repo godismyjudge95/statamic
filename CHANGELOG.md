@@ -1,5 +1,12 @@
 # Release Notes
 
+## 5.73.21 (2026-04-27)
+
+### What's fixed
+- Always show success when using forgot password form [#14539](https://github.com/statamic/cms/issues/14539) by @jasonvarga
+
+
+
 ## 5.73.20 (2026-04-13)
 
 ### What's fixed
