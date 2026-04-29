@@ -20,6 +20,7 @@ use Statamic\Http\Resources\CP\Assets\Folder;
 use Statamic\Http\Resources\CP\Assets\FolderAsset;
 use Statamic\Http\Resources\CP\Assets\SearchedAssetsCollection;
 use Statamic\Http\Resources\CP\Concerns\HasRequestedColumns;
+use Statamic\Query\OrderBy;
 use Statamic\Query\Scopes\Filters\Concerns\QueriesFilters;
 use Statamic\Support\Arr;
 
@@ -110,8 +111,7 @@ class BrowserController extends CpController
         $totalAssets = $query->count();
         $totalItems = $totalAssets + $totalFolders;
 
-        if ($request->sort) {
-            $sort = $request->sort;
+        if ($sort = OrderBy::column($request->sort)) {
             $order = $request->order ?? 'asc';
         } else {
             $sort = $container->sortField();
@@ -193,8 +193,8 @@ class BrowserController extends CpController
 
         $query = (new AssetsIndexQuery($query, $container))->query();
 
-        if ($request->sort) {
-            $query->orderBy($request->sort, $request->order ?? 'asc');
+        if ($sort = OrderBy::column($request->sort)) {
+            $query->orderBy($sort, $request->order ?? 'asc');
         }
 
         $this->applyQueryScopes($query, $request->all());
