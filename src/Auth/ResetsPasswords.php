@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password as PasswordRules;
 use Illuminate\Validation\ValidationException;
+use Statamic\Facades\URL;
 
 /**
  * A copy of Illuminate\Auth\ResetsPasswords.
@@ -49,8 +50,10 @@ trait ResetsPasswords
         $validator = Validator::make($request->all(), $this->rules(), $this->validationErrorMessages());
 
         if (! $validator->passes()) {
-            $redirect = $request->has('_error_redirect')
-                ? redirect($request->input('_error_redirect'))
+            $errorRedirect = $request->input('_error_redirect');
+
+            $redirect = $errorRedirect && ! URL::isExternalToApplication($errorRedirect)
+                ? redirect($errorRedirect)
                 : back();
 
             return $redirect
@@ -127,8 +130,6 @@ trait ResetsPasswords
         $user->save();
 
         event(new PasswordReset($user));
-
-        $this->guard()->login($user);
     }
 
     /**
@@ -173,8 +174,10 @@ trait ResetsPasswords
             ]);
         }
 
-        $redirect = $request->has('_error_redirect')
-            ? redirect($request->input('_error_redirect'))
+        $errorRedirect = $request->input('_error_redirect');
+
+        $redirect = $errorRedirect && ! URL::isExternalToApplication($errorRedirect)
+            ? redirect($errorRedirect)
             : back();
 
         return $redirect

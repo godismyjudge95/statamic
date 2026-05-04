@@ -60,10 +60,12 @@ class AssetTest extends TestCase
         config(['cache.default' => 'file']);
         Cache::clear();
 
-        config(['filesystems.disks.test' => [
-            'driver' => 'local',
-            'root' => __DIR__.'/tmp',
-        ]]);
+        config([
+            'filesystems.disks.test' => [
+                'driver' => 'local',
+                'root' => __DIR__ . '/tmp',
+            ]
+        ]);
 
         $this->container = (new AssetContainer)
             ->handle('test_container')
@@ -350,27 +352,28 @@ class AssetTest extends TestCase
     public static function reAddRemovedDataProvider()
     {
         return [
-            'by calling set method' => [fn ($asset) => $asset->set('one', 'new-foo')],
-            'by calling data method' => [fn ($asset) => $asset->data(['one' => 'new-foo', 'two' => 'bar', 'three' => 'qux'])],
-            'by calling merge method' => [fn ($asset) => $asset->merge(['one' => 'new-foo', 'three' => 'qux'])],
-            'by calling __set() magically via property' => [function ($asset) {
-                $asset->one = 'new-foo';
+            'by calling set method' => [fn($asset) => $asset->set('one', 'new-foo')],
+            'by calling data method' => [fn($asset) => $asset->data(['one' => 'new-foo', 'two' => 'bar', 'three' => 'qux'])],
+            'by calling merge method' => [fn($asset) => $asset->merge(['one' => 'new-foo', 'three' => 'qux'])],
+            'by calling __set() magically via property' => [
+                function ($asset) {
+                    $asset->one = 'new-foo';
 
-                return $asset;
-            }],
+                    return $asset;
+                }
+            ],
         ];
     }
 
     #[Test]
     public function it_gets_evaluated_augmented_value_using_magic_property()
     {
-        (new class extends Fieldtype
-        {
+        (new class extends Fieldtype{
             protected static $handle = 'test';
 
             public function augment($value)
             {
-                return $value.' (augmented)';
+                return $value . ' (augmented)';
             }
         })::register();
 
@@ -396,8 +399,7 @@ class AssetTest extends TestCase
         $builder->shouldReceive('get')->times(2)->andReturn('query builder results');
         app()->instance('mocked-builder', $builder);
 
-        (new class extends Fieldtype
-        {
+        (new class extends Fieldtype{
             protected static $handle = 'test';
 
             public function augment($value)
@@ -636,8 +638,33 @@ class AssetTest extends TestCase
     public function it_checks_if_it_can_be_previewed_in_google_docs_previewer()
     {
         $extensions = [
-            'doc', 'docx', 'pages', 'txt', 'ai', 'psd', 'eps', 'ps', 'css', 'html', 'php', 'c', 'cpp', 'h', 'hpp', 'js',
-            'ppt', 'pptx', 'flv', 'tiff', 'ttf', 'dxf', 'xps', 'zip', 'rar', 'xls', 'xlsx',
+            'doc',
+            'docx',
+            'pages',
+            'txt',
+            'ai',
+            'psd',
+            'eps',
+            'ps',
+            'css',
+            'html',
+            'php',
+            'c',
+            'cpp',
+            'h',
+            'hpp',
+            'js',
+            'ppt',
+            'pptx',
+            'flv',
+            'tiff',
+            'ttf',
+            'dxf',
+            'xps',
+            'zip',
+            'rar',
+            'xls',
+            'xlsx',
         ];
 
         foreach ($extensions as $ext) {
@@ -662,6 +689,22 @@ class AssetTest extends TestCase
         $lastModified = $asset->lastModified();
         $this->assertInstanceOf(Carbon::class, $lastModified);
         $this->assertEquals(Carbon::parse('2017-01-02 14:35:00')->timestamp, $lastModified->timestamp);
+    }
+
+    #[Test]
+    public function it_does_not_throw_when_getting_last_modified_and_file_doesnt_exist()
+    {
+        // This is really a workaround for an underlying bug.
+        // It's odd for an asset to not have a corresponding file.
+        // Once resolved, this test could be removed, although it doesn't hurt by being here.
+
+        Storage::fake('test');
+        // Intentionally do no not create the actual file.
+
+        $asset = (new Asset)->container($this->container)->path('foo/test.txt');
+
+        $lastModified = $asset->lastModified();
+        $this->assertInstanceOf(Carbon::class, $lastModified);
     }
 
     #[Test]
@@ -715,7 +758,7 @@ class AssetTest extends TestCase
     {
         config()->set('statamic.assets.meta_as_content', true);
         $relativePath = 'foo/test.txt';
-        $metaFilePath = Stache::store('assets')->directory()."/test/{$relativePath}.yaml";
+        $metaFilePath = Stache::store('assets')->directory() . "/test/{$relativePath}.yaml";
 
         Storage::fake('test');
         Storage::disk('test')->put($relativePath, '');
@@ -977,7 +1020,6 @@ class AssetTest extends TestCase
 
         $reflection = new ReflectionClass($asset);
         $property = $reflection->getProperty('withEvents');
-        $property->setAccessible(true);
         $withEvents = $property->getValue($asset);
         $this->assertTrue($withEvents);
     }
@@ -1131,6 +1173,28 @@ class AssetTest extends TestCase
     }
 
     #[Test]
+    public function it_doesnt_dispatch_creating_or_created_events_when_moved()
+    {
+        Event::fake();
+        Storage::fake('local');
+        $disk = Storage::disk('local');
+        $disk->put('old/asset.txt', 'The asset contents');
+        $container = Facades\AssetContainer::make('test')->disk('local');
+        Facades\AssetContainer::shouldReceive('save')->with($container);
+        Facades\AssetContainer::shouldReceive('findByHandle')->with('test')->andReturn($container);
+        $asset = $container->makeAsset('old/asset.txt')->data(['foo' => 'bar']);
+        $asset->save();
+
+        Event::fake();
+        $asset->move('new');
+
+        Event::assertDispatched(AssetSaving::class);
+        Event::assertDispatched(AssetSaved::class);
+        Event::assertNotDispatched(AssetCreating::class);
+        Event::assertNotDispatched(AssetCreated::class);
+    }
+
+    #[Test]
     public function it_can_be_moved_to_another_folder_quietly()
     {
         Storage::fake('local');
@@ -1275,7 +1339,7 @@ class AssetTest extends TestCase
         $asset = tap($container->makeAsset('old/asset.txt')->data(['foo' => 'bar']))->save();
         $meta = $asset->meta();
 
-        $metaPath = Stache::store('assets')->directory().'/'.$container->handle();
+        $metaPath = Stache::store('assets')->directory() . '/' . $container->handle();
 
         $this->assertFileExists("{$metaPath}/old/asset.txt.yaml");
         $this->assertEquals(YAML::dump($asset->meta()), File::get("{$metaPath}/old/asset.txt.yaml"));
@@ -1290,6 +1354,70 @@ class AssetTest extends TestCase
         $this->assertFileExists($newMetaPath = "{$metaPath}/new/asset2.txt.yaml");
         $this->assertEquals(YAML::dump($meta), File::get($newMetaPath));
         $this->assertEquals(['new/asset2.txt'], $container->files()->all());
+    }
+
+    #[Test]
+    public function it_can_be_moved_uniquely_to_another_folder_when_conflict_exists()
+    {
+        Storage::fake('local');
+        $disk = Storage::disk('local');
+        $disk->put('old/asset.txt', 'The asset contents');
+        $disk->put('new/asset.txt', 'Existing asset');
+        $disk->put('new/asset-1.txt', 'Another existing asset');
+        $container = Facades\AssetContainer::make('test')->disk('local');
+        Facades\AssetContainer::shouldReceive('save')->with($container);
+        Facades\AssetContainer::shouldReceive('findByHandle')->with('test')->andReturn($container);
+        $asset = $container->makeAsset('old/asset.txt')->data(['foo' => 'bar']);
+        $asset->save();
+
+        $return = $asset->moveUnique('new');
+
+        $this->assertEquals($asset, $return);
+        $disk->assertMissing('old/asset.txt');
+        $disk->assertExists('new/asset-2.txt');
+        $this->assertEquals('new/asset-2.txt', $asset->path());
+    }
+
+    #[Test]
+    public function it_can_be_moved_uniquely_to_another_folder_without_renaming_when_no_conflict()
+    {
+        Storage::fake('local');
+        $disk = Storage::disk('local');
+        $disk->put('old/asset.txt', 'The asset contents');
+        $container = Facades\AssetContainer::make('test')->disk('local');
+        Facades\AssetContainer::shouldReceive('save')->with($container);
+        Facades\AssetContainer::shouldReceive('findByHandle')->with('test')->andReturn($container);
+        $asset = $container->makeAsset('old/asset.txt')->data(['foo' => 'bar']);
+        $asset->save();
+
+        $return = $asset->moveUnique('new');
+
+        $this->assertEquals($asset, $return);
+        $disk->assertMissing('old/asset.txt');
+        $disk->assertExists('new/asset.txt');
+        $this->assertEquals('new/asset.txt', $asset->path());
+    }
+
+    #[Test]
+    public function it_does_not_ensure_unique_filename_when_moving_by_default()
+    {
+        Storage::fake('local');
+        $disk = Storage::disk('local');
+        $disk->put('old/asset.txt', 'The asset contents');
+        $disk->put('new/asset.txt', 'Existing asset');
+        $container = Facades\AssetContainer::make('test')->disk('local');
+        Facades\AssetContainer::shouldReceive('save')->with($container);
+        Facades\AssetContainer::shouldReceive('findByHandle')->with('test')->andReturn($container);
+        $asset = $container->makeAsset('old/asset.txt')->data(['foo' => 'bar']);
+        $asset->save();
+
+        $return = $asset->move('new');
+
+        $this->assertEquals($asset, $return);
+        $disk->assertMissing('old/asset.txt');
+        // Without unique flag, it overwrites the existing file
+        $disk->assertExists('new/asset.txt');
+        $this->assertEquals('new/asset.txt', $asset->path());
     }
 
     #[Test]
@@ -1669,7 +1797,7 @@ class AssetTest extends TestCase
     public function it_gets_file_size_in_bytes()
     {
         $container = $this->container;
-        $size = filesize($fixture = __DIR__.'/__fixtures__/container/a.txt');
+        $size = filesize($fixture = __DIR__ . '/__fixtures__/container/a.txt');
         copy($fixture, Storage::disk('test')->path('test.txt'));
 
         $asset = (new Asset)
@@ -1878,10 +2006,10 @@ class AssetTest extends TestCase
             'path/to/asset.jpg',
         ], Cache::get('asset-list-contents-test_container')->keys()->all());
 
-        Event::assertDispatched(AssetCreating::class, fn ($event) => $event->asset === $asset);
-        Event::assertDispatched(AssetSaved::class, fn ($event) => $event->asset === $asset);
-        Event::assertDispatched(AssetUploaded::class, fn ($event) => $event->asset === $asset);
-        Event::assertDispatched(AssetCreated::class, fn ($event) => $event->asset === $asset);
+        Event::assertDispatched(AssetCreating::class, fn($event) => $event->asset === $asset);
+        Event::assertDispatched(AssetSaved::class, fn($event) => $event->asset === $asset);
+        Event::assertDispatched(AssetUploaded::class, fn($event) => $event->asset === $asset);
+        Event::assertDispatched(AssetCreated::class, fn($event) => $event->asset === $asset);
     }
 
     #[Test]
@@ -1889,10 +2017,12 @@ class AssetTest extends TestCase
     {
         Event::fake();
 
-        config(['statamic.assets.image_manipulation.presets.small' => [
-            'w' => '15',
-            'h' => '15',
-        ]]);
+        config([
+            'statamic.assets.image_manipulation.presets.small' => [
+                'w' => '15',
+                'h' => '15',
+            ]
+        ]);
 
         $this->container->sourcePreset('small');
 
@@ -1935,9 +2065,11 @@ class AssetTest extends TestCase
     {
         Event::fake();
 
-        config(['statamic.assets.image_manipulation.presets.enforce_png' => [
-            $formatParam => 'png',
-        ]]);
+        config([
+            'statamic.assets.image_manipulation.presets.enforce_png' => [
+                $formatParam => 'png',
+            ]
+        ]);
 
         $this->container->sourcePreset('enforce_png');
 
@@ -1964,6 +2096,38 @@ class AssetTest extends TestCase
             return $event->asset = $asset;
         });
         Event::assertDispatched(AssetSaved::class);
+    }
+
+    #[Test]
+    public function it_normalizes_pjpg_format_to_jpg_extension_on_upload()
+    {
+        Event::fake();
+
+        config([
+            'statamic.assets.image_manipulation.presets.progressive' => [
+                'fm' => 'pjpg',
+            ]
+        ]);
+
+        $this->container->sourcePreset('progressive');
+
+        $asset = (new Asset)->container($this->container)->path('path/to/asset.jpg')->syncOriginal();
+
+        Facades\AssetContainer::shouldReceive('findByHandle')->with('test_container')->andReturn($this->container);
+        Storage::disk('test')->assertMissing('path/to/asset.jpg');
+
+        ImageValidator::partialMock()
+            ->shouldReceive('isValidImage')
+            ->with('jpg', 'image/jpeg')
+            ->andReturnTrue()
+            ->once();
+
+        $return = $asset->upload(UploadedFile::fake()->image('asset.jpg', 20, 30));
+
+        $this->assertEquals($asset, $return);
+        Storage::disk('test')->assertMissing('path/to/asset.pjpg');
+        Storage::disk('test')->assertExists('path/to/asset.jpg');
+        $this->assertEquals('path/to/asset.jpg', $asset->path());
     }
 
     #[Test]
@@ -2028,10 +2192,12 @@ class AssetTest extends TestCase
     {
         Event::fake();
 
-        config(['statamic.assets.image_manipulation.presets.small' => [
-            'w' => '15',
-            'h' => '15',
-        ]]);
+        config([
+            'statamic.assets.image_manipulation.presets.small' => [
+                'w' => '15',
+                'h' => '15',
+            ]
+        ]);
 
         $this->container->sourcePreset('small');
 
@@ -2176,6 +2342,76 @@ class AssetTest extends TestCase
     }
 
     #[Test]
+    public function it_sanitizes_svgs_on_reupload()
+    {
+        Event::fake();
+
+        // Create and upload an initial clean SVG
+        $asset = (new Asset)->container($this->container)->path('path/to/asset.svg')->syncOriginal();
+        Facades\AssetContainer::shouldReceive('findByHandle')->with('test_container')->andReturn($this->container);
+        $asset->upload(UploadedFile::fake()->createWithContent('asset.svg', '<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500"></svg>'));
+        Storage::disk('test')->assertExists('path/to/asset.svg');
+
+        // Place a malicious SVG in the local disk for reupload
+        $uploadDisk = Storage::fake('local');
+        $maliciousSvg = '<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" width="500" height="500"><script type="text/javascript">alert(`Bad stuff could go in here.`);</script></svg>';
+        $uploadDisk->put('path/to/malicious.svg', $maliciousSvg);
+        $uploadDisk->assertExists('path/to/malicious.svg');
+
+        $file = new ReplacementFile('path/to/malicious.svg');
+
+        $return = $asset->reupload($file);
+
+        $this->assertEquals($asset, $return);
+        Storage::disk('test')->assertExists('path/to/asset.svg');
+
+        // Ensure the inline scripts were stripped out
+        $this->assertStringNotContainsString('<script', $asset->contents());
+        $this->assertStringNotContainsString('Bad stuff could go in here.', $asset->contents());
+        $this->assertStringNotContainsString('</script>', $asset->contents());
+
+        Event::assertDispatched(AssetReuploaded::class, function ($event) use ($asset) {
+            return $event->asset->id() === $asset->id();
+        });
+    }
+
+    #[Test]
+    public function it_does_not_sanitize_svgs_on_reupload_when_behaviour_is_disabled()
+    {
+        Event::fake();
+
+        config()->set('statamic.assets.svg_sanitization_on_upload', false);
+
+        // Create and upload an initial clean SVG
+        $asset = (new Asset)->container($this->container)->path('path/to/asset.svg')->syncOriginal();
+        Facades\AssetContainer::shouldReceive('findByHandle')->with('test_container')->andReturn($this->container);
+        $asset->upload(UploadedFile::fake()->createWithContent('asset.svg', '<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500"></svg>'));
+        Storage::disk('test')->assertExists('path/to/asset.svg');
+
+        // Place a malicious SVG in the local disk for reupload
+        $uploadDisk = Storage::fake('local');
+        $maliciousSvg = '<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" width="500" height="500"><script type="text/javascript">alert(`Bad stuff could go in here.`);</script></svg>';
+        $uploadDisk->put('path/to/malicious.svg', $maliciousSvg);
+        $uploadDisk->assertExists('path/to/malicious.svg');
+
+        $file = new ReplacementFile('path/to/malicious.svg');
+
+        $return = $asset->reupload($file);
+
+        $this->assertEquals($asset, $return);
+        Storage::disk('test')->assertExists('path/to/asset.svg');
+
+        // Ensure the inline scripts were NOT stripped out when disabled
+        $this->assertStringContainsString('<script', $asset->contents());
+        $this->assertStringContainsString('Bad stuff could go in here.', $asset->contents());
+        $this->assertStringContainsString('</script>', $asset->contents());
+
+        Event::assertDispatched(AssetReuploaded::class, function ($event) use ($asset) {
+            return $event->asset->id() === $asset->id();
+        });
+    }
+
+    #[Test]
     public function it_doesnt_lowercase_uploaded_filenames_when_configured()
     {
         config(['statamic.assets.lowercase' => false]);
@@ -2271,18 +2507,28 @@ class AssetTest extends TestCase
     private function toArrayKeysWhenFileExists()
     {
         return [
-            'size', 'size_bytes', 'size_kilobytes', 'size_megabytes', 'size_gigabytes',
-            'size_b', 'size_kb', 'size_mb', 'size_gb',
-            'last_modified', 'last_modified_timestamp', 'last_modified_instance',
-            'focus', 'focus_css', 'mime_type',
+            'size',
+            'size_bytes',
+            'size_kilobytes',
+            'size_megabytes',
+            'size_gigabytes',
+            'size_b',
+            'size_kb',
+            'size_mb',
+            'size_gb',
+            'last_modified',
+            'last_modified_timestamp',
+            'last_modified_instance',
+            'focus',
+            'focus_css',
+            'mime_type',
         ];
     }
 
     #[Test]
     public function it_converts_to_an_array()
     {
-        $fieldtype = new class extends Fieldtype
-        {
+        $fieldtype = new class extends Fieldtype {
             protected static $handle = 'test';
 
             public function augment($value)
@@ -2333,25 +2579,23 @@ class AssetTest extends TestCase
     #[Test]
     public function only_requested_relationship_fields_are_included_in_to_array()
     {
-        $regularFieldtype = new class extends Fieldtype
-        {
+        $regularFieldtype = new class extends Fieldtype {
             protected static $handle = 'regular';
 
             public function augment($value)
             {
-                return 'augmented '.$value;
+                return 'augmented ' . $value;
             }
         };
         $regularFieldtype::register();
 
-        $relationshipFieldtype = new class extends Fieldtype
-        {
+        $relationshipFieldtype = new class extends Fieldtype {
             protected static $handle = 'relationship';
             protected $relationship = true;
 
             public function augment($values)
             {
-                return collect($values)->map(fn ($value) => 'augmented '.$value)->all();
+                return collect($values)->map(fn($value) => 'augmented ' . $value)->all();
             }
         };
         $relationshipFieldtype::register();
@@ -2448,14 +2692,14 @@ class AssetTest extends TestCase
         $container->shouldReceive('url')->andReturn('/container');
         $asset = (new Asset)->container($container)->path('path/to/test.txt');
 
-        $this->assertEquals('/container/path/to/test.txt', Antlers::parse('{{ asset }}', ['asset' => $asset]));
+        $this->assertEquals('/container/path/to/test.txt', Antlers::parse('{{ asset }}', ['asset' => $asset], true));
 
-        $this->assertEquals('path/to/test.txt', Antlers::parse('{{ asset }}{{ path }}{{ /asset }}', ['asset' => $asset]));
+        $this->assertEquals('path/to/test.txt', Antlers::parse('{{ asset }}{{ path }}{{ /asset }}', ['asset' => $asset], true));
 
-        $this->assertEquals('test.txt', Antlers::parse('{{ asset:basename }}', ['asset' => $asset]));
+        $this->assertEquals('test.txt', Antlers::parse('{{ asset:basename }}', ['asset' => $asset], true));
 
         // The "asset" Tag will output nothing when an invalid asset src is passed. It doesn't throw an exception.
-        $this->assertEquals('', Antlers::parse('{{ asset src="invalid" }}{{ basename }}{{ /asset }}', ['asset' => $asset]));
+        $this->assertEquals('', Antlers::parse('{{ asset src="invalid" }}{{ basename }}{{ /asset }}', ['asset' => $asset], true));
     }
 
     #[Test]
@@ -2613,11 +2857,11 @@ YAML;
             $height = 10;
         }
 
-        $filename = 'test.'.$extension;
+        $filename = 'test.' . $extension;
         Storage::disk('test')->put($filename, '');
 
         if ($extension === 'jpg') {
-            Storage::disk('test')->put('.meta/'.$filename.'.yaml', YAML::dump([
+            Storage::disk('test')->put('.meta/' . $filename . '.yaml', YAML::dump([
                 'height' => $height,
                 'width' => $width,
             ]));

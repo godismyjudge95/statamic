@@ -16,14 +16,16 @@ use Statamic\Facades\GraphQL;
 use Statamic\Facades\Scope;
 use Statamic\Facades\User;
 use Statamic\Fields\Fieldtype;
+use Statamic\Fieldtypes\UpdatesReferences;
 use Statamic\GraphQL\Types\AssetInterface;
-use Statamic\Http\Resources\CP\Assets\Asset as AssetResource;
+use Statamic\Http\Resources\CP\Assets\AssetsFieldtypeAsset as AssetResource;
 use Statamic\Query\Scopes\Filter;
 use Statamic\Support\Arr;
 use Statamic\Support\Str;
 
 class Assets extends Fieldtype
 {
+    use UpdatesReferences;
     protected $categories = ['media', 'relationship'];
     protected $keywords = ['file', 'files', 'image', 'images', 'video', 'videos', 'audio', 'upload'];
     protected $selectableInForms = true;
@@ -259,11 +261,19 @@ class Assets extends Fieldtype
             ->defaultVisibility(false)
             ->sortable(true);
 
+        $duration = Column::make('duration')
+            ->label(__('Duration'))
+            ->value('duration_formatted')
+            ->visible(true)
+            ->defaultVisibility(false)
+            ->sortable(true);
+
         $columns->put('basename', $basename);
         $columns->put('size', $size);
         $columns->put('last_modified', $lastModified);
         $columns->put('width', $width);
         $columns->put('height', $height);
+        $columns->put('duration', $duration);
 
         $columns->setPreferred("assets.{$this->container()->handle()}.columns");
 
@@ -498,5 +508,29 @@ class Assets extends Fieldtype
         return $this->config('max_files') === 1
             ? collect($value)->first()
             : collect($value)->filter()->all();
+    }
+
+    public function replaceAssetReferences($data, ?string $newValue, string $oldValue, string $container)
+    {
+        if ($this->configuredContainerHandle() !== $container) {
+            return $data;
+        }
+
+        return is_string($data)
+            ? $this->replaceValue($data, $newValue, $oldValue)
+            : $this->replaceValuesInArray($data, $newValue, $oldValue);
+    }
+
+    protected function configuredContainerHandle(): ?string
+    {
+        if ($container = $this->config('container')) {
+            return $container;
+        }
+
+        $containers = AssetContainer::all();
+
+        return $containers->count() === 1
+            ? $containers->first()->handle()
+            : null;
     }
 }
