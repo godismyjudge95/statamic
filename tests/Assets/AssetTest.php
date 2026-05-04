@@ -63,8 +63,8 @@ class AssetTest extends TestCase
         config([
             'filesystems.disks.test' => [
                 'driver' => 'local',
-                'root' => __DIR__ . '/tmp',
-            ]
+                'root' => __DIR__.'/tmp',
+            ],
         ]);
 
         $this->container = (new AssetContainer)
@@ -352,15 +352,15 @@ class AssetTest extends TestCase
     public static function reAddRemovedDataProvider()
     {
         return [
-            'by calling set method' => [fn($asset) => $asset->set('one', 'new-foo')],
-            'by calling data method' => [fn($asset) => $asset->data(['one' => 'new-foo', 'two' => 'bar', 'three' => 'qux'])],
-            'by calling merge method' => [fn($asset) => $asset->merge(['one' => 'new-foo', 'three' => 'qux'])],
+            'by calling set method' => [fn ($asset) => $asset->set('one', 'new-foo')],
+            'by calling data method' => [fn ($asset) => $asset->data(['one' => 'new-foo', 'two' => 'bar', 'three' => 'qux'])],
+            'by calling merge method' => [fn ($asset) => $asset->merge(['one' => 'new-foo', 'three' => 'qux'])],
             'by calling __set() magically via property' => [
                 function ($asset) {
                     $asset->one = 'new-foo';
 
                     return $asset;
-                }
+                },
             ],
         ];
     }
@@ -368,12 +368,13 @@ class AssetTest extends TestCase
     #[Test]
     public function it_gets_evaluated_augmented_value_using_magic_property()
     {
-        (new class extends Fieldtype{
+        (new class extends Fieldtype
+        {
             protected static $handle = 'test';
 
             public function augment($value)
             {
-                return $value . ' (augmented)';
+                return $value.' (augmented)';
             }
         })::register();
 
@@ -399,7 +400,8 @@ class AssetTest extends TestCase
         $builder->shouldReceive('get')->times(2)->andReturn('query builder results');
         app()->instance('mocked-builder', $builder);
 
-        (new class extends Fieldtype{
+        (new class extends Fieldtype
+        {
             protected static $handle = 'test';
 
             public function augment($value)
@@ -758,7 +760,7 @@ class AssetTest extends TestCase
     {
         config()->set('statamic.assets.meta_as_content', true);
         $relativePath = 'foo/test.txt';
-        $metaFilePath = Stache::store('assets')->directory() . "/test/{$relativePath}.yaml";
+        $metaFilePath = Stache::store('assets')->directory()."/test/{$relativePath}.yaml";
 
         Storage::fake('test');
         Storage::disk('test')->put($relativePath, '');
@@ -1339,7 +1341,7 @@ class AssetTest extends TestCase
         $asset = tap($container->makeAsset('old/asset.txt')->data(['foo' => 'bar']))->save();
         $meta = $asset->meta();
 
-        $metaPath = Stache::store('assets')->directory() . '/' . $container->handle();
+        $metaPath = Stache::store('assets')->directory().'/'.$container->handle();
 
         $this->assertFileExists("{$metaPath}/old/asset.txt.yaml");
         $this->assertEquals(YAML::dump($asset->meta()), File::get("{$metaPath}/old/asset.txt.yaml"));
@@ -1797,7 +1799,7 @@ class AssetTest extends TestCase
     public function it_gets_file_size_in_bytes()
     {
         $container = $this->container;
-        $size = filesize($fixture = __DIR__ . '/__fixtures__/container/a.txt');
+        $size = filesize($fixture = __DIR__.'/__fixtures__/container/a.txt');
         copy($fixture, Storage::disk('test')->path('test.txt'));
 
         $asset = (new Asset)
@@ -2006,10 +2008,10 @@ class AssetTest extends TestCase
             'path/to/asset.jpg',
         ], Cache::get('asset-list-contents-test_container')->keys()->all());
 
-        Event::assertDispatched(AssetCreating::class, fn($event) => $event->asset === $asset);
-        Event::assertDispatched(AssetSaved::class, fn($event) => $event->asset === $asset);
-        Event::assertDispatched(AssetUploaded::class, fn($event) => $event->asset === $asset);
-        Event::assertDispatched(AssetCreated::class, fn($event) => $event->asset === $asset);
+        Event::assertDispatched(AssetCreating::class, fn ($event) => $event->asset === $asset);
+        Event::assertDispatched(AssetSaved::class, fn ($event) => $event->asset === $asset);
+        Event::assertDispatched(AssetUploaded::class, fn ($event) => $event->asset === $asset);
+        Event::assertDispatched(AssetCreated::class, fn ($event) => $event->asset === $asset);
     }
 
     #[Test]
@@ -2021,7 +2023,7 @@ class AssetTest extends TestCase
             'statamic.assets.image_manipulation.presets.small' => [
                 'w' => '15',
                 'h' => '15',
-            ]
+            ],
         ]);
 
         $this->container->sourcePreset('small');
@@ -2068,7 +2070,7 @@ class AssetTest extends TestCase
         config([
             'statamic.assets.image_manipulation.presets.enforce_png' => [
                 $formatParam => 'png',
-            ]
+            ],
         ]);
 
         $this->container->sourcePreset('enforce_png');
@@ -2106,7 +2108,7 @@ class AssetTest extends TestCase
         config([
             'statamic.assets.image_manipulation.presets.progressive' => [
                 'fm' => 'pjpg',
-            ]
+            ],
         ]);
 
         $this->container->sourcePreset('progressive');
@@ -2196,7 +2198,7 @@ class AssetTest extends TestCase
             'statamic.assets.image_manipulation.presets.small' => [
                 'w' => '15',
                 'h' => '15',
-            ]
+            ],
         ]);
 
         $this->container->sourcePreset('small');
@@ -2528,7 +2530,8 @@ class AssetTest extends TestCase
     #[Test]
     public function it_converts_to_an_array()
     {
-        $fieldtype = new class extends Fieldtype {
+        $fieldtype = new class extends Fieldtype
+        {
             protected static $handle = 'test';
 
             public function augment($value)
@@ -2579,23 +2582,25 @@ class AssetTest extends TestCase
     #[Test]
     public function only_requested_relationship_fields_are_included_in_to_array()
     {
-        $regularFieldtype = new class extends Fieldtype {
+        $regularFieldtype = new class extends Fieldtype
+        {
             protected static $handle = 'regular';
 
             public function augment($value)
             {
-                return 'augmented ' . $value;
+                return 'augmented '.$value;
             }
         };
         $regularFieldtype::register();
 
-        $relationshipFieldtype = new class extends Fieldtype {
+        $relationshipFieldtype = new class extends Fieldtype
+        {
             protected static $handle = 'relationship';
             protected $relationship = true;
 
             public function augment($values)
             {
-                return collect($values)->map(fn($value) => 'augmented ' . $value)->all();
+                return collect($values)->map(fn ($value) => 'augmented '.$value)->all();
             }
         };
         $relationshipFieldtype::register();
@@ -2857,11 +2862,11 @@ YAML;
             $height = 10;
         }
 
-        $filename = 'test.' . $extension;
+        $filename = 'test.'.$extension;
         Storage::disk('test')->put($filename, '');
 
         if ($extension === 'jpg') {
-            Storage::disk('test')->put('.meta/' . $filename . '.yaml', YAML::dump([
+            Storage::disk('test')->put('.meta/'.$filename.'.yaml', YAML::dump([
                 'height' => $height,
                 'width' => $width,
             ]));
