@@ -18,7 +18,11 @@
         >
         </asset-editor>
 
-        <div class="flex h-full rounded-b-md relative" :class="{ 'bg-checkerboard rounded-lg!': canBeTransparent, 'border-b dark:border-gray-700': showFilename }">
+        <div class="flex h-full w-full justify-center rounded-b-md relative" :class="[
+            { 'border-b dark:border-gray-700': showFilename },
+            canBeTransparent && checkerboardMode !== 'transparent' ? `bg-checkerboard bg-checkerboard-${checkerboardMode} rounded-lg` : '',
+            canBeTransparent && checkerboardMode === 'transparent' ? `bg-checkerboard before:opacity-0 hover:before:opacity-100 rounded-lg` : '',
+        ]">
             <div class="p-1 flex flex-col items-center justify-center h-full">
                 <template v-if="errors.length">
                     <div class="absolute z-10 inset-0 bg-white/75 dark:bg-dark-800/90 flex flex-col gap-2 items-center justify-center px-1 py-2">
@@ -35,7 +39,7 @@
                 </template>
 
                 <template v-else>
-                    <img v-if="canShowSvg" :src="asset.url" :title="label" class="p-4 size-full relative" />
+                    <img v-if="canShowSvg" :src="asset.url" :title="label" class="p-4 w-full relative" />
 
                     <template v-else>
                         <img :src="thumbnail" v-if="thumbnail" :title="label" class="rounded-md relative"  />
@@ -89,6 +93,13 @@ export default {
     },
 
     mixins: [Asset],
+
+    props: {
+        checkerboardMode: {
+            type: String,
+            default: 'transparent',
+        },
+    },
 
     computed: {
         isInAssetBrowser() {
